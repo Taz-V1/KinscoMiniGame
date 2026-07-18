@@ -48,7 +48,7 @@
   .pressin { text-align:right; font-size:max(calc(var(--u)*3.6),10px);
              margin-top:calc(var(--u)*2); visibility:hidden; }
   .corner { position:absolute; font-size:max(calc(var(--u)*4),10px); }
-  .home   { top:3%; left:4%; cursor:pointer; }
+  .home   { position:fixed; top:2vh; left:2vw; cursor:pointer; }
   .home img { height:max(calc(var(--u)*14),28px); display:block; mix-blend-mode:multiply; }
   .count  { top:3%; right:4%; }
   .hint   { position:absolute; bottom:3%; width:100%; text-align:center;
@@ -60,7 +60,7 @@
 <script>
 "use strict";
 /* ================= config — paste real links here ================= */
-const PREORDER_FORM_URL = "";   // provided later
+const PREORDER_FORM_URL = "https://tally.so/r/44D4Ld";   // SPC pickup form
 const FEEDBACK_FORM_URL = "";   // provided later
 const CATCH_TO_WIN      = 8;
 
@@ -222,48 +222,71 @@ function paper(x,y){ D.fill(x,y,12,16,CREAM); D.box(x,y,12,16); D.px(x+5,y-1);
   D.fill(x+2,y+4,8,1); D.fill(x+2,y+7,8,1); D.fill(x+2,y+10,5,1); }
 function blueprint(x,y){ D.fill(x,y,20,16,CREAM); D.box(x,y,20,16);
   D.ring(x+10,y+8,4); D.px(x+10,y+8); D.fill(x+2,y+2,4,1); }
-
-function interiorScene(){                      // menu + intro opening
-  const mx=56;                                 // flow: ingredients in right ->, cookies out left
-  // wall sign + pinned papers
-  const sy=Math.max(20,GROUND-146);            // below the corner logo; higher on tall screens
-  D.fill(34,sy,172,16,CREAM); D.box(34,sy,172,16);
-  signText("KINSCO'S COOKIE LAB",120,sy+8.5);
-  const py=Math.max(sy+22,GROUND-104);
-  paper(24,py); blueprint(14,py+22); paper(220,py+2);
-  for(let i=0;i<9;i++){                        // blipping cookies fill the tall sky
+function chart(x,y){ D.fill(x,y,18,13,CREAM); D.box(x,y,18,13);        // line-graph chart
+  D.fill(x+3,y+3,1,8); D.fill(x+3,y+10,12,1);
+  D.px(x+5,y+8); D.px(x+7,y+7); D.px(x+9,y+8); D.px(x+11,y+5); D.px(x+13,y+4); }
+function framedPic(x,y){                       // hanging framed landscape
+  D.px(x+11,y); D.px(x+12,y);                                          // nail
+  D.px(x+9,y+2); D.px(x+7,y+4); D.px(x+5,y+5);                         // string
+  D.px(x+14,y+2); D.px(x+16,y+4); D.px(x+18,y+5);
+  D.box(x+2,y+6,20,26); D.box(x+4,y+8,16,22);                          // double frame
+  D.fill(x+5,y+9,14,20,CREAM);
+  ctx.save(); ctx.beginPath(); ctx.rect(x+5,y+9,14,20); ctx.clip();
+  D.fill(x+13,y+12,3,2,FADED); D.px(x+14,y+11,FADED);                  // sun
+  D.fill(x+7,y+15,5,1,FADED); D.px(x+8,y+14,FADED);                    // cloud
+  D.disk(x+9,y+31,6,7,FADED); D.disk(x+17,y+32,5,6,FADED);             // hills
+  ctx.restore();
+}
+function skyBlips(maxY){                       // blipping cookies fill spare sky
+  const zone=Math.max(8,maxY-14), N=zone>300?22:zone>120?14:9;
+  for(let i=0;i<N;i++){
     const cyc=(now/1000+i*0.29)/2.6, p=cyc%1, n=Math.floor(cyc);
     const r1=Math.abs(Math.sin(i*12.9898+n*78.233))%1, r2=Math.abs(Math.sin(i*39.425+n*11.135))%1;
-    const y=16+r2*(GROUND-196);
-    if(GROUND>230 && p<0.75){ const s=(p<0.12||p>0.63)?8:14;
-      ctx.drawImage(BGCOOKIES[i%3],(12+r1*(W-36)+(14-s)/2)|0,(y+(14-s)/2)|0,s,s); } }
-  // wall shelf with glassware
-  D.fill(172,GROUND-66,42,2);
-  testTube(178,GROUND-66); testTube(186,GROUND-66); roundFlask(204,GROUND-66);
+    if(p<0.75){ const s=(p<0.12||p>0.63)?8:14;
+      ctx.drawImage(BGCOOKIES[i%3],(12+r1*(W-36)+(14-s)/2)|0,(10+r2*zone+(14-s)/2)|0,s,s); } }
+}
+
+function interiorScene(){                      // menu + intro opening
+  const mx=36, B=GROUND;                       // big machine; flow right -> left
+  const sy=Math.round(H*0.22);                 // sign, ~78% up the screen
+  D.fill(34,sy,172,16,CREAM); D.box(34,sy,172,16);
+  signText("KINSCO'S COOKIE LAB",120,sy+8.5);
+  skyBlips(sy-14);
+  // charts + papers on the wall
+  blueprint(78,B-152); chart(106,B-140); paper(134,B-150); chart(219,B-134);
+  framedPic(186,B-140);                        // framed landscape above Kin
+  // two wall shelves with glassware, up high
+  D.fill(2,B-190,28,2);
+  roundFlask(12,B-190); testTube(24,B-190);
+  D.fill(150,B-150,64,2);
+  testTube(158,B-150); testTube(166,B-150); roundFlask(202,B-150);
+  ctx.drawImage(COOKIES[1],178,B-159);         // display cookie, mid right shelf
+  // supply pipes, in from the left with 90-degree bends
+  D.box(0,B-166,56,8); D.box(48,B-166,8,88);
+  D.fill(0,B-165,55,6,CREAM); D.fill(49,B-165,6,87,CREAM);
+  D.box(0,B-136,30,8); D.box(22,B-136,8,48); D.box(22,B-96,15,8);
+  D.fill(0,B-135,29,6,CREAM); D.fill(23,B-135,6,46,CREAM); D.fill(23,B-95,13,6,CREAM);
   // the cookie machine
-  D.fill(mx+8,GROUND-61,8,9,CREAM); D.box(mx+8,GROUND-61,8,10);        // vent pipe
-  D.fill(mx,GROUND-52,52,52,CREAM); D.box(mx,GROUND-52,52,52);         // body
-  D.blob(mx+26,GROUND-34,9.5,9.5);                                     // cookie logo
-  D.fill(mx+21,GROUND-39,2,2); D.fill(mx+29,GROUND-37,2,2); D.fill(mx+24,GROUND-30,2,2);
+  D.fill(mx+12,B-92,12,15,CREAM); D.box(mx+12,B-92,12,15);             // vent pipe
+  D.fill(mx,B-78,78,78,CREAM); D.box(mx,B-78,78,78);                   // body
+  D.blob(mx+19,B-50,14,14);                                            // cookie logo
+  D.fill(mx+11,B-58,3,3); D.fill(mx+25,B-54,3,3); D.fill(mx+16,B-43,3,3);
   for(let i=0;i<3;i++){ const on=((now/dialT|0)%3)===i;                // cycling dial lights
-    if(on) D.fill(mx+6+i*8,GROUND-12,4,4); else D.box(mx+6+i*8,GROUND-12,4,4); }
+    if(on) D.fill(mx+10+i*12,B-16,6,6); else D.box(mx+10+i*12,B-16,6,6); }
   // conveyors (right to left through the machine)
-  D.fill(0,GROUND-20,mx,1); D.fill(mx+52,GROUND-20,84,1);
-  for(let x=4;x<mx-2;x+=10){ D.px(x,GROUND-18); D.px(x+1,GROUND-18); }
-  for(let x=mx+56;x<mx+132;x+=10){ D.px(x,GROUND-18); D.px(x+1,GROUND-18); }
-  const off=(now/1000*16)%96;
-  ctx.save(); ctx.beginPath(); ctx.rect(mx+52,0,W,H); ctx.clip();      // ingredients slide INTO the machine
-  for(let i=0;i<4;i++){ const ix=186-((off+i*24)%96);
-    if(ix>mx+40){ const g=INGR[i%INGR.length];
-      ctx.drawImage(g,(ix-g.width/2)|0,GROUND-20-g.height); } }
+  D.fill(0,B-30,mx,1); D.fill(mx+78,B-30,86,1);
+  for(let x=4;x<mx-2;x+=10){ D.px(x,B-28); D.px(x+1,B-28); }
+  for(let x=mx+82;x<mx+160;x+=10){ D.px(x,B-28); D.px(x+1,B-28); }
+  const off=(now/1000*16)%108;
+  ctx.save(); ctx.beginPath(); ctx.rect(mx+78,0,W,H); ctx.clip();      // ingredients slide INTO the machine
+  for(let i=0;i<3;i++){ const ix=198-((off+i*36)%108);
+    if(ix>mx+66){ const g2=INGR[i%INGR.length];
+      ctx.drawImage(g2,(ix-g2.width)|0,B-30-g2.height*2,g2.width*2,g2.height*2); } }
   ctx.restore();
   ctx.save(); ctx.beginPath(); ctx.rect(0,0,mx,H); ctx.clip();         // cookies emerge OUT of it
-  for(let i=0;i<3;i++){ const ix=mx+4-((off+i*32)%96);
-    if(ix>-8) ctx.drawImage(COOKIES[i%3],(ix-4)|0,GROUND-29); }
+  for(let i=0;i<3;i++){ const ix=mx+8-((off+i*36)%108);
+    if(ix>-18) ctx.drawImage(COOKIES[i%3],(ix-9)|0,B-48,18,18); }
   ctx.restore();
-  // ingredient bench, right where Kin works
-  D.fill(208,GROUND-24,30,2); D.fill(210,GROUND-22,2,22); D.fill(234,GROUND-22,2,22);
-  roundFlask(214,GROUND-24); testTube(226,GROUND-24); testTube(234,GROUND-24);
   ground();
 }
 
@@ -271,7 +294,7 @@ function exteriorScene(damaged,shake=0){       // tiny lab atop a big distant hi
   const F=FADED, bx=Math.round(34+shake), by=GROUND-40, d=D;
   for(let i=0;i<3;i++){                                                // slow drifting clouds
     const cx=((now/1000*(3+i*2)+i*95)%(W+60))-30;
-    ctx.drawImage(CLOUD,cx|0,[14,40,64][i]); }
+    ctx.drawImage(CLOUD,cx|0,(H*[0.06,0.16,0.26][i])|0); }
   ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,GROUND); ctx.clip();     // hill ends at the floor
   d.blob(52,GROUND+30,78,72,CREAM,F);
   ctx.restore();
@@ -304,10 +327,11 @@ let erupt=[], eruptT=0;
 function eruption(dt){
   const c0=craterPos();
   if((eruptT-=dt)<=0){ eruptT=0.11;
-    erupt.push({x:c0.x,y:c0.y,vx:(Math.random()-0.5)*36,vy:-(90+Math.random()*80),k:(Math.random()*3)|0}); }
+    const a=(Math.random()-0.5)*(Math.PI/2), sp=110+Math.random()*80;  // 90-degree funnel
+    erupt.push({x:c0.x,y:c0.y,vx:Math.sin(a)*sp,vy:-Math.cos(a)*sp,k:(Math.random()*3)|0}); }
   erupt=erupt.filter(c=>{
-    c.x+=c.vx*dt; c.y+=c.vy*dt;                  // straight up and off the top
-    return c.y>-10; });
+    c.x+=c.vx*dt; c.y+=c.vy*dt;                  // straight out and off the screen
+    return c.y>-10 && c.x>-10 && c.x<W+10; });
   for(const c of erupt) ctx.drawImage(BGCOOKIES[c.k], (c.x-4)|0, (c.y-4)|0);
 }
 
@@ -343,34 +367,34 @@ const S={};
 S.start={
   enter(){ ui.innerHTML='<div class="title">Kinsco Cafe</div>'+
     '<div class="press blink">PRESS TO START</div>'; },
-  draw(){ mascotAt(90,H-116,2);
-    ctx.drawImage(COOKIES[0],42,H-92+Math.sin(t*2)*3,18,18);
-    ctx.drawImage(COOKIES[2],184,H-100+Math.cos(t*2)*3,18,18); },
+  draw(){ skyBlips(H-20); mascotAt(90,(H/2-40)|0,2);
+    ctx.drawImage(COOKIES[0],44,(H/2-16+Math.sin(t*2)*3)|0,18,18);
+    ctx.drawImage(COOKIES[2],178,(H/2-30+Math.cos(t*2)*3)|0,18,18); },
   click(){ setState("menu"); },
 };
 
 S.menu={   // lab interior
   enter(){ ui.innerHTML=HOME+
-    '<div style="position:absolute;bottom:calc(var(--u)*82);width:100%;display:flex;flex-direction:column;align-items:center">'+
+    '<div style="position:absolute;top:calc(22% + var(--u)*24);width:100%;display:flex;flex-direction:column;align-items:center">'+
     '<button class="btn" id="pre">Pre-order</button><button class="btn" id="fb">Feedback</button></div>';
     ui.querySelector("#pre").onclick=e=>{ e.stopPropagation(); setState("intro"); };
     ui.querySelector("#fb").onclick =e=>{ e.stopPropagation(); setState("feedback"); }; },
   draw(dt){ interiorScene();
-    mascotAt(186,GROUND-39,1);                                         // Kin loading the belt
-    if((t*0.9|0)!==((t-dt)*0.9|0)) puff(68,GROUND-66);                 // machine smoke
-    if((t*0.7|0)!==((t-dt)*0.7|0)) puff(204,GROUND-87,0.5);            // flask steam
+    mascotAt(170,GROUND-79,2);                                         // Kin loading the belt
+    if((t*0.9|0)!==((t-dt)*0.9|0)) puff(54,GROUND-96);                 // machine smoke
+    if((t*0.7|0)!==((t-dt)*0.7|0)) puff(202,GROUND-121,0.5);           // flask steam
     drawSmokes(dt); },
 };
 
 S.feedback={
   enter(){ ui.innerHTML=HOME+
-    '<div class="dialog"><p id="txt"></p><button class="btn" id="go">Open feedback form &gt;</button></div>';
+    '<div class="dialog" style="bottom:auto;top:calc(50% + var(--u)*44)"><p id="txt"></p><button class="btn" id="go">Open feedback form &gt;</button></div>';
     const b=ui.querySelector("#go");
     typeInto(ui.querySelector("#txt"),
       "Hi Kins! We need help with some quality control. You'll be rewarded with an entry to our raffle ticket!",
       ()=>b.style.visibility="visible");
     b.onclick=e=>{ e.stopPropagation(); goForm(FEEDBACK_FORM_URL,b); }; },
-  draw(){ mascotAt(90,H-156,2,(now/400|0)%2); },
+  draw(){ skyBlips(H-20); mascotAt(90,(H/2-40)|0,2,(now/400|0)%2); },
   click(){ if(typing) typing(); },
 };
 
@@ -380,15 +404,15 @@ S.intro={  // inside: smoke ramps ~7s -> outside: 3s shake, BOOM, spin-up, drop-
   draw(dt){
     if(t<7.4){
       interiorScene();
-      mascotAt(186,GROUND-39,1,t>6.2?(now/200|0)%2:undefined);
+      mascotAt(170,GROUND-79,2,t>6.2?(now/200|0)%2:undefined);
       const lvl=Math.min(3,1+(t/2|0)), rate=[0.8,1.7,3.4][lvl-1];     // smoke level up every 2s
       dialT=[400,220,120][lvl-1];                                     // machine panics too
       if((t*rate|0)!==((t-dt)*rate|0)){
-        if(lvl===1) puff(68,GROUND-66,0.55);
-        else if(lvl===2) puff(68,GROUND-66,0.15);
-        else { puff(68,GROUND-72,0,true); puff(64+Math.random()*8,GROUND-64,0.3); } }
-      if(t>6.2){ D.fill(173,GROUND-66,56,16,CREAM); D.box(173,GROUND-66,56,16);
-        signText("Oh no!",201,GROUND-58); }
+        if(lvl===1) puff(54,GROUND-96,0.55);
+        else if(lvl===2) puff(54,GROUND-96,0.15);
+        else { puff(54,GROUND-102,0,true); puff(50+Math.random()*8,GROUND-94,0.3); } }
+      if(t>6.2){ D.fill(122,GROUND-110,56,16,CREAM); D.box(122,GROUND-110,56,16);
+        signText("Oh no!",150,GROUND-102); }
       drawSmokes(dt);
     } else {
       if(!this.cut){ this.cut=true; smokes=[]; }   // scene cut: drop indoor smoke
@@ -464,15 +488,15 @@ S.game={
 
 S.win={
   enter(){ ui.innerHTML=HOME+
-    '<div class="dialog"><p id="txt"></p><button class="btn" id="go">Pre-order now &gt;</button></div>';
+    '<div class="dialog" style="bottom:auto;top:calc(50% + var(--u)*44)"><p id="txt"></p><button class="btn" id="go">Pre-order now &gt;</button></div>';
     const b=ui.querySelector("#go");
     typeInto(ui.querySelector("#txt"),
       "Thank you for collecting my cookies! Now it's your turn to pick up your cookies at SPC.",
       ()=>b.style.visibility="visible");
     b.onclick=e=>{ e.stopPropagation(); goForm(PREORDER_FORM_URL,b); }; },
-  draw(){ mascotAt(90,H-156,2,(now/400|0)%2);
-    ctx.drawImage(COOKIES[0],56,H-128+Math.sin(t*2)*3,18,18);
-    ctx.drawImage(COOKIES[2],172,H-134+Math.cos(t*2)*3,18,18); },
+  draw(){ skyBlips(H-20); mascotAt(90,(H/2-40)|0,2,(now/400|0)%2);
+    ctx.drawImage(COOKIES[0],44,(H/2-16+Math.sin(t*2)*3)|0,18,18);
+    ctx.drawImage(COOKIES[2],178,(H/2-30+Math.cos(t*2)*3)|0,18,18); },
   click(){ if(typing) typing(); },
 };
 
@@ -493,8 +517,8 @@ stage.addEventListener("click",e=>{ state.move&&state.move(toGameX(e)); state.cl
 /* ---------- resize + main loop ---------- */
 function resize(){
   const iw=innerWidth||960, ih=innerHeight||600;   // hidden tabs report 0x0
-  H=Math.max(150,Math.min(520,Math.round(W*ih/iw)));  // match viewport aspect
-  GROUND=H-26;
+  H=Math.max(400,Math.min(560,Math.round(W*ih/iw)));  // full-viewport, portrait-column render
+  GROUND=Math.round(H*0.75);                          // floor sits 25% from the bottom
   cv.height=H; ctx.imageSmoothingEnabled=false;
   const s=Math.min(iw/W,ih/H)*0.99;
   cv.style.width=W*s+"px"; cv.style.height=H*s+"px"; stage.style.setProperty("--u",s+"px");
