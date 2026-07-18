@@ -100,23 +100,27 @@ function signText(txt,cx,cy,size=8){ ctx.fillStyle=RED; ctx.font=size+'px "Press
 function mk(w,h){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
 
 function bakeMascot(){                        // 30 x 40, faces left
-  const c=mk(30,40), d=H2(c.getContext("2d"));
+  const c=mk(30,40), g=c.getContext("2d"), d=H2(g);
   // silhouette
   d.disk(12,2,2,2); d.disk(15,1.5,2,2); d.disk(17.5,2.5,2,2);    // hat puffs
   d.fill(11,2,8,4);                                              // hat block
-  d.disk(14.5,10,7,5.5);                                         // head: flat bump, near-centered
+  d.disk(15,13,9,8);                                             // upper egg: head area, leans left
   d.disk(17,22,11,13);                                           // body
   d.disk(12,34,3.5,5); d.disk(22,34,3.5,5);                      // legs
   // carve interior -> outline of the union
   d.disk(12,2,1,1,CREAM); d.disk(15,1.5,1,1,CREAM); d.disk(17.5,2.5,1,1,CREAM);
   d.fill(12,3,6,3,CREAM);
-  d.disk(14.5,10,6,4.5,CREAM);
+  d.disk(15,13,8,7,CREAM);
   d.disk(17,22,10,12,CREAM);
   d.disk(12,34,2.5,4,CREAM); d.disk(22,34,2.5,4,CREAM);
   // details
   d.fill(11,6,8,1);                                              // hat brim
   d.px(12,8);                                                    // eye
-  d.fill(8,10,6,1);                                              // side slit, ~halfway in
+  d.px(7,12);                                                    // head curls in like a circle...
+  d.fill(8,12,7,1);                                              // ...then the chin crease, straight
+  g.clearRect(5,12,2,1); g.clearRect(5,13,3,2);                  // cave-in: head flops over the body
+  d.px(8,13); d.px(8,14); d.px(7,15);                            // indented edge rejoining the outline
+  g.clearRect(16,35,3,1); d.fill(15,34,5,1);                     // smooth, level arch between the legs
   d.blob(13,22,3.5,4.5); d.blob(21,22,3.5,4.5);                  // arm hooks...
   d.fill(9,17,16,4,CREAM);                                       // ...top half erased -> "U"
   return c;
@@ -366,7 +370,7 @@ S.feedback={
       "Hi Kins! We need help with some quality control. You'll be rewarded with an entry to our raffle ticket!",
       ()=>b.style.visibility="visible");
     b.onclick=e=>{ e.stopPropagation(); goForm(FEEDBACK_FORM_URL,b); }; },
-  draw(){ mascotAt(90,H-156,2,(now/200|0)%2); },
+  draw(){ mascotAt(90,H-156,2,(now/400|0)%2); },
   click(){ if(typing) typing(); },
 };
 
