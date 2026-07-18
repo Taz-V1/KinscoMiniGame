@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Kinsco Cafe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root { --red:#c22820; --cream:#f9f1e5; }
+  * { margin:0; box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    background:var(--cream); color:var(--red);
+    font-family:"Press Start 2P", monospace;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; user-select:none; -webkit-user-select:none; touch-action:none;
+  }
+  #stage { position:relative; }
+  canvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; }
+  #ui { position:absolute; inset:0; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center; pointer-events:none; }
+  #ui > * { pointer-events:auto; }
+  .title  { position:absolute; top:14%; width:100%;
+            font-size:max(calc(var(--u)*11),24px); line-height:1.2; }
+  .press  { position:absolute; bottom:7%; width:100%; text-align:center;
+            font-size:max(calc(var(--u)*5),12px); }
+  .blink  { animation:blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  .btn {
+    font:inherit; font-size:max(calc(var(--u)*6),14px); color:var(--red);
+    background:var(--cream); border:calc(var(--u)*0.8) solid var(--red);
+    border-radius:calc(var(--u)*1.5); padding:calc(var(--u)*3.5) calc(var(--u)*8);
+    cursor:pointer; margin:calc(var(--u)*2);
+  }
+  .btn:hover { background:var(--red); color:var(--cream); }
+  .dialog {
+    position:absolute; left:5%; right:5%; bottom:5%; text-align:left;
+    background:var(--cream); border:calc(var(--u)*0.8) solid var(--red);
+    border-radius:calc(var(--u)*1.5); padding:calc(var(--u)*4) calc(var(--u)*5);
+    font-size:max(calc(var(--u)*4.4),11px); line-height:1.8; cursor:pointer;
+  }
+  .dialog.top { top:13%; bottom:auto; }
+  .dialog p { min-height:calc(var(--u)*16); }
+  .dialog .btn { display:block; margin:calc(var(--u)*2) 0 0 auto; visibility:hidden;
+                 padding:calc(var(--u)*2.5) calc(var(--u)*5); font-size:max(calc(var(--u)*4.4),11px); }
+  .pressin { text-align:right; font-size:max(calc(var(--u)*3.6),10px);
+             margin-top:calc(var(--u)*2); visibility:hidden; }
+  .corner { position:absolute; font-size:max(calc(var(--u)*4),10px); }
+  .home   { top:3%; left:4%; cursor:pointer; }
+  .home img { height:max(calc(var(--u)*14),28px); display:block; mix-blend-mode:multiply; }
+  .count  { top:3%; right:4%; }
+  .hint   { position:absolute; bottom:3%; width:100%; text-align:center;
+            font-size:max(calc(var(--u)*3.6),10px); }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv" width="240" height="160"></canvas><div id="ui"></div></div>
+<script>
+"use strict";
+/* ================= config — paste real links here ================= */
+const PREORDER_FORM_URL = "";   // provided later
+const FEEDBACK_FORM_URL = "";   // provided later
+const CATCH_TO_WIN      = 8;
+
+const W=240;
+let H=160, GROUND=134;          // dynamic: canvas grows taller on portrait screens
+const RED="#c22820", CREAM="#f9f1e5", FADED="#dfa595";
+
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const ui=document.getElementById("ui"), stage=document.getElementById("stage");
+ctx.imageSmoothingEnabled=false;
+if(document.fonts) document.fonts.load('8px "Press Start 2P"');
+
+/* ---------- tiny pixel helpers, usable on any 2d context ---------- */
+function H2(g){ return {
+  px:(x,y,c=RED)=>{ g.fillStyle=c; g.fillRect(x|0,y|0,1,1); },
+  fill:(x,y,w,h,c=RED)=>{ g.fillStyle=c; g.fillRect(x|0,y|0,w,h); },
+  box:(x,y,w,h,c=RED)=>{ g.fillStyle=c; g.fillRect(x,y,w,1); g.fillRect(x,y+h-1,w,1);
+                         g.fillRect(x,y,1,h); g.fillRect(x+w-1,y,1,h); },
+  disk:(cx,cy,rx,ry,c=RED)=>{                       // solid ellipse
+    for(let y=Math.floor(cy-ry);y<=cy+ry;y++) for(let x=Math.floor(cx-rx);x<=cx+rx;x++)
+      if(Math.hypot((x-cx)/rx,(y-cy)/ry)<=1){ g.fillStyle=c; g.fillRect(x,y,1,1); } },
+  blob:(cx,cy,rx,ry,fc=CREAM,lc=RED)=>{             // filled ellipse with pixel outline
+    const th=1.4/Math.min(rx,ry);
+    for(let y=Math.floor(cy-ry);y<=cy+ry;y++) for(let x=Math.floor(cx-rx);x<=cx+rx;x++){
+      const s=Math.hypot((x-cx)/rx,(y-cy)/ry);
+      if(s<=1){ g.fillStyle = s>=1-th ? lc : fc; g.fillRect(x,y,1,1); } }},
+  ring:(cx,cy,r,c=RED)=>{ for(let a=0;a<40;a++){ const t=a/40*6.2832;
+      g.fillStyle=c; g.fillRect((cx+Math.cos(t)*r)|0,(cy+Math.sin(t)*r)|0,1,1); } },
+};}
+const D=H2(ctx);
+function signText(txt,cx,cy,size=8){ ctx.fillStyle=RED; ctx.font=size+'px "Press Start 2P"';
+  ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt,cx,cy); }
+
+/* ---------- sprites ----------
+   mascot = outline-union of simple shapes (solid red silhouettes, then the
+   same shapes shrunk 1px in cream: what survives is the union's outline) */
+function mk(w,h){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
+
+function bakeMascot(){                        // 30 x 40, faces left
+  const c=mk(30,40), d=H2(c.getContext("2d"));
+  // silhouette
+  d.disk(12,2,2,2); d.disk(15,1.5,2,2); d.disk(17.5,2.5,2,2);    // hat puffs
+  d.fill(11,2,8,4);                                              // hat block
+  d.disk(14.5,10,7,5.5);                                         // head: flat bump, near-centered
+  d.disk(17,22,11,13);                                           // body
+  d.disk(12,34,3.5,5); d.disk(22,34,3.5,5);                      // legs
+  // carve interior -> outline of the union
+  d.disk(12,2,1,1,CREAM); d.disk(15,1.5,1,1,CREAM); d.disk(17.5,2.5,1,1,CREAM);
+  d.fill(12,3,6,3,CREAM);
+  d.disk(14.5,10,6,4.5,CREAM);
+  d.disk(17,22,10,12,CREAM);
+  d.disk(12,34,2.5,4,CREAM); d.disk(22,34,2.5,4,CREAM);
+  // details
+  d.fill(11,6,8,1);                                              // hat brim
+  d.px(12,8);                                                    // eye
+  d.fill(8,10,6,1);                                              // side slit, ~halfway in
+  d.blob(13,22,3.5,4.5); d.blob(21,22,3.5,4.5);                  // arm hooks...
+  d.fill(9,17,16,4,CREAM);                                       // ...top half erased -> "U"
+  return c;
+}
+function bobFrame(c,ex,ey){ const c2=mk(c.width,c.height), g=c2.getContext("2d");
+  g.drawImage(c,0,1);                            // body dips 1px; feet stay on the baseline
+  H2(g).fill(ex-1,ey+1,3,1,RED);                 // blink
+  return c2; }
+function flipC(c){ const f=mk(c.width,c.height), g=f.getContext("2d");
+  g.translate(c.width,0); g.scale(-1,1); g.drawImage(c,0,0); return f; }
+const M0=bakeMascot(), MASCOT=[M0,bobFrame(M0,12,8)];
+const MASCOT_R=[flipC(MASCOT[0]),flipC(MASCOT[1])];
+function mascotAt(x,y,s=1,frame,right=false){ const f=frame??((now/400|0)%2);
+  ctx.drawImage((right?MASCOT_R:MASCOT)[f], x|0, y|0, 30*s, 40*s); }
+function mascotSpin(cx,cy,ang){ ctx.save(); ctx.translate(cx|0,cy|0); ctx.rotate(ang);
+  ctx.drawImage(M0,-15,-20); ctx.restore(); }
+
+function bakeCookie(v,col=RED){               // 9 x 9
+  const c=mk(9,9), d=H2(c.getContext("2d"));
+  d.blob(4,4,3.8,3.8,CREAM,col);
+  if(v===0){ d.px(3,2,col); d.px(5,4,col); d.px(2,5,col); }      // choc chips
+  if(v===1){ d.fill(2,3,2,1,col); d.fill(5,2,1,2,col); d.px(4,5,col); } // squares
+  if(v===2){ d.px(4,3,col); d.px(5,4,col); d.px(4,5,col); d.px(3,4,col); } // swirl
+  return c;
+}
+const COOKIES=[bakeCookie(0),bakeCookie(1),bakeCookie(2)];
+const BGCOOKIES=[bakeCookie(0,FADED),bakeCookie(1,FADED),bakeCookie(2,FADED)];
+
+/* ---------- conveyor ingredients (more welcome later) ---------- */
+function bakeFlour(){ const c=mk(11,12), d=H2(c.getContext("2d"));
+  d.fill(2,5,7,6,CREAM); d.box(1,4,9,8);                         // sack
+  d.fill(4,3,3,1,CREAM); d.px(3,3); d.px(7,3);                   // neck
+  d.fill(3,1,5,2,CREAM); d.box(3,1,5,2);                         // tied top
+  d.fill(3,7,5,1); return c; }                                   // label stripe
+function bakeMilk(){ const c=mk(9,12), d=H2(c.getContext("2d"));
+  d.fill(2,5,5,6,CREAM); d.box(1,4,7,8);
+  d.px(2,3); d.fill(3,2,3,1); d.px(6,3);
+  d.fill(3,7,3,1); return c; }
+function bakeEggs(){ const c=mk(13,8), d=H2(c.getContext("2d"));  // open carton
+  d.blob(3.5,3.5,1.7,2); d.blob(6.5,3,1.7,2); d.blob(9.5,3.5,1.7,2);
+  d.fill(2,5,9,2,CREAM); d.box(1,4,11,4); return c; }
+const INGR=[bakeFlour(),bakeMilk(),bakeEggs()];
+function bakeCloud(){ const c=mk(26,11), d=H2(c.getContext("2d"));
+  d.blob(6,6.5,5,3.5,CREAM,FADED); d.blob(13,5,6,4.5,CREAM,FADED);
+  d.blob(20,7,4.5,3,CREAM,FADED); return c; }
+const CLOUD=bakeCloud();
+
+/* ---------- smoke: puffy 3-frame clusters ---------- */
+const SGREY="#b6b6b6", SDARK="#8e8e8e";
+function bakeSmoke(f){
+  if(f===0){ const c=mk(18,14), d=H2(c.getContext("2d"));
+    d.blob(6,8,4.5,4,SGREY,SDARK); d.blob(11,5,5,4,SGREY,SDARK); d.blob(13,9,3.5,3,SGREY,SDARK);
+    return c; }
+  if(f===1){ const c=mk(13,10), d=H2(c.getContext("2d"));
+    d.blob(4,6,3,2.5,SGREY,SDARK); d.blob(8,4,3.5,3,SGREY,SDARK); return c; }
+  const c=mk(10,8), d=H2(c.getContext("2d"));
+  d.blob(2.5,4,1.6,1.6,SGREY,SDARK); d.blob(7,2.5,2,1.8,SGREY,SDARK); d.px(8,6,SDARK); return c;
+}
+const SMOKE=[bakeSmoke(0),bakeSmoke(1),bakeSmoke(2)];
+function bakeSmokeBig(){                       // funnel plume, widening upward: NOT normal
+  const c=mk(22,22), d=H2(c.getContext("2d"));
+  d.blob(10,19,2.2,2,SGREY,SDARK);
+  d.blob(10,15,3.2,2.6,SGREY,SDARK);
+  d.blob(9,10,4.2,3.2,SGREY,SDARK); d.blob(13,9,3.4,2.8,SGREY,SDARK);
+  d.blob(5,4,3.6,3,SGREY,SDARK); d.blob(11,3,4.4,3.2,SGREY,SDARK); d.blob(17,5,3.2,2.6,SGREY,SDARK);
+  return c;
+}
+const SMOKEBIG=bakeSmokeBig();
+let smokes=[], dialT=400;
+function puff(x,y,age=0,big=false){ smokes.push({x,y,t:age,big}); }
+function drawSmokes(dt){
+  smokes=smokes.filter(s=>(s.t+=dt)<1.25);
+  for(const s of smokes){ s.y-=(s.big?13:10)*dt; s.x+=Math.sin(s.t*6+s.y)*4*dt;
+    const c=s.big ? (s.t<0.55?SMOKEBIG:s.t<0.9?SMOKE[0]:SMOKE[1])
+                  : SMOKE[s.t<0.45?0:s.t<0.85?1:2];
+    ctx.drawImage(c,(s.x-c.width/2)|0,(s.y-c.height/2)|0); }
+}
+
+/* ---------- explosion blast (layered fireball) ---------- */
+function drawBoom(cx,cy,p){
+  const R=6+p*20;
+  const L=[[0,0,1],[0.75,-0.3,0.72],[-0.75,0.25,0.66],[0.3,0.65,0.6],[-0.35,-0.6,0.62]];
+  for(const c of [["#c22820",1],["#f2711c",0.8],["#ffcf3f",0.58],["#fffbe9",0.3]])
+    for(const l of L) D.disk(cx+l[0]*R*0.5, cy+l[1]*R*0.42, R*l[2]*c[1]*0.62, R*l[2]*c[1]*0.55, c[0]);
+  for(let a=0;a<10;a++){ const q=a*0.628+p*2.5;
+    D.fill(cx+Math.cos(q)*R*1.2, cy+Math.sin(q)*R*1.05, 2,2, "#c22820"); }
+}
+
+/* ---------- lab scenes (all GROUND-relative for dynamic height) ---------- */
+function ground(){ D.fill(0,GROUND,W,1); D.px(24,GROUND+4); D.px(90,GROUND+6); D.px(180,GROUND+3); }
+function grassAt(x){ D.px(x,GROUND-1); D.px(x+1,GROUND-2); D.px(x+2,GROUND-1); }
+function flowerAt(x){ D.fill(x,GROUND-2,1,2); D.px(x-1,GROUND-3,FADED); D.px(x+1,GROUND-3,FADED);
+  D.px(x,GROUND-4,FADED); D.px(x,GROUND-3); }
+function roundFlask(x,by=GROUND){ D.fill(x-2,by-18,1,10); D.fill(x+2,by-18,1,10);
+  D.fill(x-1,by-18,3,9,CREAM); D.blob(x,by-6,5.5,5.5); D.fill(x-3,by-19,7,1); }
+function testTube(x,by=GROUND){ const b=((now/450+x)|0)%2;             // bubbling liquid
+  D.fill(x+1,by-11,2,10,CREAM); D.box(x,by-12,4,12); D.fill(x+1,by-4-b,2,3+b); }
+function paper(x,y){ D.fill(x,y,12,16,CREAM); D.box(x,y,12,16); D.px(x+5,y-1);
+  D.fill(x+2,y+4,8,1); D.fill(x+2,y+7,8,1); D.fill(x+2,y+10,5,1); }
+function blueprint(x,y){ D.fill(x,y,20,16,CREAM); D.box(x,y,20,16);
+  D.ring(x+10,y+8,4); D.px(x+10,y+8); D.fill(x+2,y+2,4,1); }
+
+function interiorScene(){                      // menu + intro opening
+  const mx=56;                                 // flow: ingredients in right ->, cookies out left
+  // wall sign + pinned papers
+  const sy=Math.max(20,GROUND-146);            // below the corner logo; higher on tall screens
+  D.fill(34,sy,172,16,CREAM); D.box(34,sy,172,16);
+  signText("KINSCO'S COOKIE LAB",120,sy+8.5);
+  const py=Math.max(sy+22,GROUND-104);
+  paper(24,py); blueprint(14,py+22); paper(220,py+2);
+  for(let i=0;i<9;i++){                        // blipping cookies fill the tall sky
+    const cyc=(now/1000+i*0.29)/2.6, p=cyc%1, n=Math.floor(cyc);
+    const r1=Math.abs(Math.sin(i*12.9898+n*78.233))%1, r2=Math.abs(Math.sin(i*39.425+n*11.135))%1;
+    const y=16+r2*(GROUND-196);
+    if(GROUND>230 && p<0.75){ const s=(p<0.12||p>0.63)?8:14;
+      ctx.drawImage(BGCOOKIES[i%3],(12+r1*(W-36)+(14-s)/2)|0,(y+(14-s)/2)|0,s,s); } }
+  // wall shelf with glassware
+  D.fill(172,GROUND-66,42,2);
+  testTube(178,GROUND-66); testTube(186,GROUND-66); roundFlask(204,GROUND-66);
+  // the cookie machine
+  D.fill(mx+8,GROUND-61,8,9,CREAM); D.box(mx+8,GROUND-61,8,10);        // vent pipe
+  D.fill(mx,GROUND-52,52,52,CREAM); D.box(mx,GROUND-52,52,52);         // body
+  D.blob(mx+26,GROUND-34,9.5,9.5);                                     // cookie logo
+  D.fill(mx+21,GROUND-39,2,2); D.fill(mx+29,GROUND-37,2,2); D.fill(mx+24,GROUND-30,2,2);
+  for(let i=0;i<3;i++){ const on=((now/dialT|0)%3)===i;                // cycling dial lights
+    if(on) D.fill(mx+6+i*8,GROUND-12,4,4); else D.box(mx+6+i*8,GROUND-12,4,4); }
+  // conveyors (right to left through the machine)
+  D.fill(0,GROUND-20,mx,1); D.fill(mx+52,GROUND-20,84,1);
+  for(let x=4;x<mx-2;x+=10){ D.px(x,GROUND-18); D.px(x+1,GROUND-18); }
+  for(let x=mx+56;x<mx+132;x+=10){ D.px(x,GROUND-18); D.px(x+1,GROUND-18); }
+  const off=(now/1000*16)%96;
+  ctx.save(); ctx.beginPath(); ctx.rect(mx+52,0,W,H); ctx.clip();      // ingredients slide INTO the machine
+  for(let i=0;i<4;i++){ const ix=186-((off+i*24)%96);
+    if(ix>mx+40){ const g=INGR[i%INGR.length];
+      ctx.drawImage(g,(ix-g.width/2)|0,GROUND-20-g.height); } }
+  ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,mx,H); ctx.clip();         // cookies emerge OUT of it
+  for(let i=0;i<3;i++){ const ix=mx+4-((off+i*32)%96);
+    if(ix>-8) ctx.drawImage(COOKIES[i%3],(ix-4)|0,GROUND-29); }
+  ctx.restore();
+  // ingredient bench, right where Kin works
+  D.fill(208,GROUND-24,30,2); D.fill(210,GROUND-22,2,22); D.fill(234,GROUND-22,2,22);
+  roundFlask(214,GROUND-24); testTube(226,GROUND-24); testTube(234,GROUND-24);
+  ground();
+}
+
+function exteriorScene(damaged,shake=0){       // tiny lab atop a big distant hill
+  const F=FADED, bx=Math.round(34+shake), by=GROUND-40, d=D;
+  for(let i=0;i<3;i++){                                                // slow drifting clouds
+    const cx=((now/1000*(3+i*2)+i*95)%(W+60))-30;
+    ctx.drawImage(CLOUD,cx|0,[14,40,64][i]); }
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,GROUND); ctx.clip();     // hill ends at the floor
+  d.blob(52,GROUND+30,78,72,CREAM,F);
+  ctx.restore();
+  d.fill(bx,by-22,36,22,CREAM);                                        // building fill
+  d.fill(bx,by-1,36,1,F); d.fill(bx,by-22,1,22,F);                     // bottom + left wall
+  if(!damaged){
+    d.fill(bx,by-22,36,1,F); d.fill(bx+35,by-22,1,22,F);               // top + right wall
+    d.fill(bx-2,by-24,40,2,F);                                         // roof ledge
+    d.fill(bx+26,by-29,4,6,CREAM); d.box(bx+25,by-30,6,8,F);           // vent stack
+    d.fill(bx+3,by-19,30,5,CREAM); d.box(bx+3,by-19,30,5,F);           // signboard
+  } else {
+    d.fill(bx,by-22,18,1,F);                                           // top edge, left part
+    d.fill(bx+35,by-11,1,11,F);                                        // right wall, lower part
+    d.fill(bx-2,by-24,22,2,F);                                         // roof ledge remnant
+    d.fill(bx+18,by-22,1,3,F);  d.fill(bx+18,by-20,6,1,F);             // jagged crater edge
+    d.fill(bx+24,by-20,1,4,F);  d.fill(bx+24,by-17,6,1,F);
+    d.fill(bx+30,by-17,1,4,F);  d.fill(bx+30,by-14,4,1,F);
+    d.fill(bx+34,by-14,1,4,F);
+    d.px(bx+21,by-26,F); d.px(bx+30,by-25,F); d.px(bx+38,by-16,F);     // debris
+  }
+  d.box(bx+14,by-8,8,8,F); d.px(bx+16,by-4,F);                         // door
+  d.box(bx+4,by-13,7,5,F); d.fill(bx+7,by-13,1,5,F);                   // window
+  ground();
+  grassAt(16); flowerAt(44); grassAt(96); flowerAt(140); grassAt(176); flowerAt(215); grassAt(228);
+}
+function craterPos(){ return {x:60,y:GROUND-58}; }
+
+/* ---------- cookie eruption from the lab (background element) ---------- */
+let erupt=[], eruptT=0;
+function eruption(dt){
+  const c0=craterPos();
+  if((eruptT-=dt)<=0){ eruptT=0.11;
+    erupt.push({x:c0.x,y:c0.y,vx:(Math.random()-0.5)*36,vy:-(90+Math.random()*80),k:(Math.random()*3)|0}); }
+  erupt=erupt.filter(c=>{
+    c.x+=c.vx*dt; c.y+=c.vy*dt;                  // straight up and off the top
+    return c.y>-10; });
+  for(const c of erupt) ctx.drawImage(BGCOOKIES[c.k], (c.x-4)|0, (c.y-4)|0);
+}
+
+/* ---------- shared bits ---------- */
+let particles=[];
+function burst(x,y,n,spread){ for(let i=0;i<n;i++) particles.push({
+  x,y, vx:(Math.random()-0.5)*spread, vy:-Math.random()*spread*0.7, t:0 }); }
+function drawParticles(dt){
+  particles=particles.filter(p=>(p.t+=dt)<0.5);
+  for(const p of particles){ p.x+=p.vx*dt*60; p.y+=p.vy*dt*60; p.vy+=dt*8; D.px(p.x,p.y); }
+}
+let flashes=[];
+function drawFlashes(dt){                       // catch blip: white pop -> fading ring
+  flashes=flashes.filter(f=>(f.t+=dt)<0.22);
+  for(const f of flashes){ const p=f.t/0.22;
+    if(p<0.5) D.blob(f.x,f.y,4.5,4.5,"#ffffff",RED);
+    else D.ring(f.x,f.y,4+p*4); }
+}
+function goForm(url,btn){ if(!url){ btn.textContent="Form link coming soon!"; return; } location.href=url; }
+let typing=null;
+function typeInto(el,text,done){
+  let i=0; const id=setInterval(()=>{ el.textContent=text.slice(0,++i);
+    if(i>=text.length){ clearInterval(id); typing=null; done&&done(); } },28);
+  typing=()=>{ clearInterval(id); el.textContent=text; typing=null; done&&done(); };
+}
+const HOME='<div class="corner home" id="home"><img src="logo.png" alt="Kinsco" '+
+  'onerror="this.outerHTML=\'Kinsco Cafe\'"></div>';
+
+/* ---------- state machine ---------- */
+let state, t=0, now=0;
+const S={};
+
+S.start={
+  enter(){ ui.innerHTML='<div class="title">Kinsco Cafe</div>'+
+    '<div class="press blink">PRESS TO START</div>'; },
+  draw(){ mascotAt(90,H-116,2);
+    ctx.drawImage(COOKIES[0],42,H-92+Math.sin(t*2)*3,18,18);
+    ctx.drawImage(COOKIES[2],184,H-100+Math.cos(t*2)*3,18,18); },
+  click(){ setState("menu"); },
+};
+
+S.menu={   // lab interior
+  enter(){ ui.innerHTML=HOME+
+    '<div style="position:absolute;bottom:calc(var(--u)*82);width:100%;display:flex;flex-direction:column;align-items:center">'+
+    '<button class="btn" id="pre">Pre-order</button><button class="btn" id="fb">Feedback</button></div>';
+    ui.querySelector("#pre").onclick=e=>{ e.stopPropagation(); setState("intro"); };
+    ui.querySelector("#fb").onclick =e=>{ e.stopPropagation(); setState("feedback"); }; },
+  draw(dt){ interiorScene();
+    mascotAt(186,GROUND-39,1);                                         // Kin loading the belt
+    if((t*0.9|0)!==((t-dt)*0.9|0)) puff(68,GROUND-66);                 // machine smoke
+    if((t*0.7|0)!==((t-dt)*0.7|0)) puff(204,GROUND-87,0.5);            // flask steam
+    drawSmokes(dt); },
+};
+
+S.feedback={
+  enter(){ ui.innerHTML=HOME+
+    '<div class="dialog"><p id="txt"></p><button class="btn" id="go">Open feedback form &gt;</button></div>';
+    const b=ui.querySelector("#go");
+    typeInto(ui.querySelector("#txt"),
+      "Hi Kins! We need help with some quality control. You'll be rewarded with an entry to our raffle ticket!",
+      ()=>b.style.visibility="visible");
+    b.onclick=e=>{ e.stopPropagation(); goForm(FEEDBACK_FORM_URL,b); }; },
+  draw(){ mascotAt(90,H-156,2,(now/200|0)%2); },
+  click(){ if(typing) typing(); },
+};
+
+S.intro={  // inside: smoke ramps ~7s -> outside: 3s shake, BOOM, spin-up, drop-in
+  enter(){ this.boomed=false; this.landed=false; this.cut=false;
+    ui.innerHTML=HOME+'<div class="hint blink">(tap to skip)</div>'; },
+  draw(dt){
+    if(t<7.4){
+      interiorScene();
+      mascotAt(186,GROUND-39,1,t>6.2?(now/200|0)%2:undefined);
+      const lvl=Math.min(3,1+(t/2|0)), rate=[0.8,1.7,3.4][lvl-1];     // smoke level up every 2s
+      dialT=[400,220,120][lvl-1];                                     // machine panics too
+      if((t*rate|0)!==((t-dt)*rate|0)){
+        if(lvl===1) puff(68,GROUND-66,0.55);
+        else if(lvl===2) puff(68,GROUND-66,0.15);
+        else { puff(68,GROUND-72,0,true); puff(64+Math.random()*8,GROUND-64,0.3); } }
+      if(t>6.2){ D.fill(173,GROUND-66,56,16,CREAM); D.box(173,GROUND-66,56,16);
+        signText("Oh no!",201,GROUND-58); }
+      drawSmokes(dt);
+    } else {
+      if(!this.cut){ this.cut=true; smokes=[]; }   // scene cut: drop indoor smoke
+      const t2=t-7.4, c0=craterPos();
+      const amp=(t2>0.3&&t2<2.3)?Math.min(2.5,(t2-0.3)*1.3):0;        // 2s of building shake
+      exteriorScene(t2>2.65, amp*Math.sin(t*55));
+      if(t2>=2.3){
+        if(!this.boomed){ this.boomed=true; burst(c0.x,c0.y,14,3); }
+        const p=(t2-2.3)/0.55;
+        if(t2>2.5) eruption(dt);
+        if(p<1) drawBoom(c0.x,c0.y,p);
+        const u1=(t2-2.45)/0.75;                                      // spin up, offscreen
+        if(u1>=0&&u1<1) mascotSpin(c0.x+30*u1, c0.y-(c0.y+50)*u1, u1*12.6);
+        const u2=(t2-3.45)/0.8;                                       // drop in, up front
+        if(u2>=0&&u2<1) mascotAt(185, -50+(GROUND+11)*u2*u2, 1, (t*10|0)%2);
+        if(u2>=1){ if(!this.landed){ this.landed=true; burst(200,GROUND,8,2); }
+          mascotAt(185, GROUND-39, 1); }
+      }
+      if(t2>4.6) setState("meet");
+    }
+    drawParticles(dt);
+  },
+  click(){ setState("meet"); },
+};
+
+S.meet={   // Kin introduces itself; press to take control
+  enter(){ ui.innerHTML=HOME+
+    '<div class="dialog top"><p id="txt"></p><div class="pressin blink" id="cont">PRESS TO CONTINUE</div></div>';
+    const p=ui.querySelector("#cont");
+    typeInto(ui.querySelector("#txt"),
+      "Hi! My name is Kin. Our cookie machine just exploded! Please help me collect the cookies!",
+      ()=>p.style.visibility="visible"); },
+  draw(dt){ exteriorScene(true); eruption(dt);
+    mascotAt(185, GROUND-39, 1, typing?(now/200|0)%2:undefined);
+    drawParticles(dt); },
+  click(){ if(typing) typing(); else setState("game"); },
+};
+
+S.game={
+  enter(){ this.tx=200; this.target=200; this.cookies=[]; this.caught=0; this.spawn=0.5;
+    this.winAt=0; this.face=false;
+    ui.innerHTML=HOME+'<div class="corner count" id="count"></div><div class="hint" id="ghint">Catch the cookies!</div>';
+    this.count=ui.querySelector("#count"); this.count.textContent="0 / "+CATCH_TO_WIN; },
+  draw(dt){
+    exteriorScene(true); eruption(dt);
+    const dir=(keys.has("ArrowRight")||keys.has("d")?1:0)-(keys.has("ArrowLeft")||keys.has("a")?1:0);
+    if(dir) this.target=this.tx+dir*20;
+    const dx=Math.max(-160*dt,Math.min(160*dt,this.target-this.tx));
+    this.tx=Math.max(15,Math.min(W-15,this.tx+dx));
+    if(dx>0.3) this.face=true; else if(dx<-0.3) this.face=false;      // face the way we walk
+    if((this.spawn-=dt)<=0){ this.spawn=Math.max(0.45,0.85-this.caught*0.04);
+      this.cookies.push({x:14+Math.random()*(W-28), y:-8,
+        v:45+Math.random()*25+this.caught*2, k:(Math.random()*3)|0}); }
+    this.cookies=this.cookies.filter(c=>{
+      c.y+=c.v*dt;
+      if(!this.winAt && Math.abs(c.x-this.tx)<16 && c.y>GROUND-36 && c.y<GROUND-2){
+        this.caught++; this.count.textContent=this.caught+" / "+CATCH_TO_WIN;
+        flashes.push({x:c.x,y:c.y,t:0});
+        if(this.caught>=CATCH_TO_WIN) this.winAt=t+0.4;
+        return false; }
+      if(c.y>=GROUND-4){ burst(c.x,GROUND-2,2,1); return false; }
+      return true; });
+    for(const c of this.cookies) ctx.drawImage(COOKIES[c.k], (c.x-4)|0, (c.y-4)|0);
+    mascotAt(this.tx-15, GROUND-39, 1,
+      Math.abs(dx)>0.2 ? (now/150|0)%2 : (now/400|0)%2, this.face);
+    drawFlashes(dt);
+    drawParticles(dt);
+    if(t>2.5){ const h=ui.querySelector("#ghint"); if(h) h.remove(); }
+    if(this.winAt && t>this.winAt) setState("win");
+  },
+  move(x){ this.target=x; },
+};
+
+S.win={
+  enter(){ ui.innerHTML=HOME+
+    '<div class="dialog"><p id="txt"></p><button class="btn" id="go">Pre-order now &gt;</button></div>';
+    const b=ui.querySelector("#go");
+    typeInto(ui.querySelector("#txt"),
+      "Thank you for collecting my cookies! Now it's your turn to pick up your cookies at SPC.",
+      ()=>b.style.visibility="visible");
+    b.onclick=e=>{ e.stopPropagation(); goForm(PREORDER_FORM_URL,b); }; },
+  draw(){ mascotAt(90,H-156,2,(now/400|0)%2);
+    ctx.drawImage(COOKIES[0],56,H-128+Math.sin(t*2)*3,18,18);
+    ctx.drawImage(COOKIES[2],172,H-134+Math.cos(t*2)*3,18,18); },
+  click(){ if(typing) typing(); },
+};
+
+function setState(n){ state=S[n]; t=0; typing=null; dialT=400;
+  particles=[]; erupt=[]; smokes=[]; flashes=[]; state.enter();
+  const h=ui.querySelector("#home"); if(h) h.onclick=e=>{ e.stopPropagation(); setState("menu"); }; }
+
+/* ---------- input ---------- */
+const keys=new Set();
+addEventListener("keydown",e=>{ keys.add(e.key);
+  if(e.key==="Enter"||e.key===" ") state.click&&state.click(); });
+addEventListener("keyup",e=>keys.delete(e.key));
+function toGameX(e){ const r=cv.getBoundingClientRect(); return (e.clientX-r.left)/r.width*W; }
+stage.addEventListener("pointerdown",e=>{ state.move&&state.move(toGameX(e)); });
+stage.addEventListener("pointermove",e=>{ if(e.buttons||e.pointerType==="mouse") state.move&&state.move(toGameX(e)); });
+stage.addEventListener("click",e=>{ state.move&&state.move(toGameX(e)); state.click&&state.click(); });
+
+/* ---------- resize + main loop ---------- */
+function resize(){
+  const iw=innerWidth||960, ih=innerHeight||600;   // hidden tabs report 0x0
+  H=Math.max(150,Math.min(520,Math.round(W*ih/iw)));  // match viewport aspect
+  GROUND=H-26;
+  cv.height=H; ctx.imageSmoothingEnabled=false;
+  const s=Math.min(iw/W,ih/H)*0.99;
+  cv.style.width=W*s+"px"; cv.style.height=H*s+"px"; stage.style.setProperty("--u",s+"px");
+}
+addEventListener("resize",resize); resize();
+
+let last=performance.now();
+function loop(n){ now=n; const dt=Math.min(0.05,(n-last)/1000); last=n; t+=dt;
+  ctx.fillStyle=CREAM; ctx.fillRect(0,0,W,H);
+  state.draw(dt);
+  requestAnimationFrame(loop); }
+setState("start");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
