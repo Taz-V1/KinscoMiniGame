@@ -530,10 +530,10 @@ stage.addEventListener("click",e=>{ state.move&&state.move(toGameX(e)); state.cl
 /* ---------- resize + main loop ---------- */
 function resize(){
   const iw=innerWidth||960, ih=innerHeight||600;   // hidden tabs report 0x0
-  H=Math.max(520,Math.min(560,Math.round(W*ih/iw)));  // full-viewport, portrait-column render
+  H=Math.max(140,Math.min(560,Math.round(W*ih/iw)));  // internal height tracks viewport aspect
   GROUND=Math.round(H*0.75);                          // floor sits 25% from the bottom
   cv.height=H; ctx.imageSmoothingEnabled=false;
-  const s=Math.min(iw/W,ih/H)*0.99;
+  const s=iw/W;                                       // fill the full width, edge to edge
   cv.style.width=W*s+"px"; cv.style.height=H*s+"px"; stage.style.setProperty("--u",s+"px");
 }
 addEventListener("resize",resize); resize();
