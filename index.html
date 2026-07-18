@@ -225,6 +225,18 @@ function blueprint(x,y){ D.fill(x,y,20,16,CREAM); D.box(x,y,20,16);
 function chart(x,y){ D.fill(x,y,18,13,CREAM); D.box(x,y,18,13);        // line-graph chart
   D.fill(x+3,y+3,1,8); D.fill(x+3,y+10,12,1);
   D.px(x+5,y+8); D.px(x+7,y+7); D.px(x+9,y+8); D.px(x+11,y+5); D.px(x+13,y+4); }
+function hangingPlant(x,y){                    // hanging pot with trailing vines
+  D.px(x+11,y); D.px(x+12,y);                                          // hook
+  D.px(x+9,y+3); D.px(x+7,y+6); D.px(x+5,y+9);                         // ropes
+  D.px(x+14,y+3); D.px(x+16,y+6); D.px(x+18,y+9);
+  D.blob(x+7,y+12,4.5,3,CREAM,FADED); D.blob(x+16,y+12,4.5,3,CREAM,FADED); // leaf mound
+  D.blob(x+11.5,y+10,5,3,CREAM,FADED);
+  D.fill(x+4,y+14,16,3,CREAM); D.box(x+4,y+14,16,3);                   // pot rim
+  D.fill(x+6,y+17,12,7,CREAM); D.box(x+6,y+17,12,7);                   // pot body
+  D.fill(x+2,y+15,1,6,FADED); D.px(x+2,y+22,FADED); D.px(x+3,y+25,FADED); // trailing vines
+  D.fill(x+21,y+15,1,8,FADED); D.px(x+21,y+25,FADED); D.px(x+20,y+28,FADED);
+  D.px(x+5,y+26,FADED); D.px(x+5,y+29,FADED);
+}
 function framedPic(x,y){                       // hanging framed landscape
   D.px(x+11,y); D.px(x+12,y);                                          // nail
   D.px(x+9,y+2); D.px(x+7,y+4); D.px(x+5,y+5);                         // string
@@ -252,20 +264,21 @@ function interiorScene(){                      // menu + intro opening
   D.fill(34,sy,172,16,CREAM); D.box(34,sy,172,16);
   signText("KINSCO'S COOKIE LAB",120,sy+8.5);
   skyBlips(sy-14);
-  // charts + papers on the wall
-  blueprint(78,B-152); chart(106,B-140); paper(134,B-150); chart(219,B-134);
-  framedPic(186,B-140);                        // framed landscape above Kin
-  // two wall shelves with glassware, up high
-  D.fill(2,B-190,28,2);
-  roundFlask(12,B-190); testTube(24,B-190);
-  D.fill(150,B-150,64,2);
-  testTube(158,B-150); testTube(166,B-150); roundFlask(202,B-150);
-  ctx.drawImage(COOKIES[1],178,B-159);         // display cookie, mid right shelf
-  // supply pipes, in from the left with 90-degree bends
-  D.box(0,B-166,56,8); D.box(48,B-166,8,88);
-  D.fill(0,B-165,55,6,CREAM); D.fill(49,B-165,6,87,CREAM);
-  D.box(0,B-136,30,8); D.box(22,B-136,8,48); D.box(22,B-96,15,8);
-  D.fill(0,B-135,29,6,CREAM); D.fill(23,B-135,6,46,CREAM); D.fill(23,B-95,13,6,CREAM);
+  // charts + papers, level with the shelves
+  blueprint(78,B-184); chart(106,B-180); paper(134,B-184); chart(219,B-180);
+  framedPic(165,B-140);                        // framed landscape, centered machine-to-edge
+  hangingPlant(135,B-142); hangingPlant(195,B-142);  // plants flanking it
+  // two wall shelves with glassware
+  D.fill(18,B-176,28,2);
+  roundFlask(28,B-176); testTube(40,B-176);
+  D.fill(150,B-176,64,2);
+  testTube(158,B-176); testTube(166,B-176); roundFlask(202,B-176);
+  ctx.drawImage(COOKIES[1],178,B-185);         // display cookie, mid right shelf
+  // supply pipes: in from the left, elbowing down right of the exhaust
+  D.box(0,B-151,102,8); D.box(94,B-151,8,73);
+  D.fill(0,B-150,101,6,CREAM); D.fill(95,B-150,6,72,CREAM);
+  D.box(0,B-121,78,8); D.box(70,B-121,8,43);
+  D.fill(0,B-120,77,6,CREAM); D.fill(71,B-120,6,42,CREAM);
   // the cookie machine
   D.fill(mx+12,B-92,12,15,CREAM); D.box(mx+12,B-92,12,15);             // vent pipe
   D.fill(mx,B-78,78,78,CREAM); D.box(mx,B-78,78,78);                   // body
@@ -382,7 +395,7 @@ S.menu={   // lab interior
   draw(dt){ interiorScene();
     mascotAt(170,GROUND-79,2);                                         // Kin loading the belt
     if((t*0.9|0)!==((t-dt)*0.9|0)) puff(54,GROUND-96);                 // machine smoke
-    if((t*0.7|0)!==((t-dt)*0.7|0)) puff(202,GROUND-121,0.5);           // flask steam
+    if((t*0.7|0)!==((t-dt)*0.7|0)) puff(202,GROUND-197,0.5);           // flask steam
     drawSmokes(dt); },
 };
 
@@ -517,7 +530,7 @@ stage.addEventListener("click",e=>{ state.move&&state.move(toGameX(e)); state.cl
 /* ---------- resize + main loop ---------- */
 function resize(){
   const iw=innerWidth||960, ih=innerHeight||600;   // hidden tabs report 0x0
-  H=Math.max(400,Math.min(560,Math.round(W*ih/iw)));  // full-viewport, portrait-column render
+  H=Math.max(520,Math.min(560,Math.round(W*ih/iw)));  // full-viewport, portrait-column render
   GROUND=Math.round(H*0.75);                          // floor sits 25% from the bottom
   cv.height=H; ctx.imageSmoothingEnabled=false;
   const s=Math.min(iw/W,ih/H)*0.99;
