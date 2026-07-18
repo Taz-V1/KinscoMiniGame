@@ -210,7 +210,7 @@ function drawBoom(cx,cy,p){
 }
 
 /* ---------- lab scenes (all GROUND-relative for dynamic height) ---------- */
-function ground(){ D.fill(0,GROUND,W,1); D.px(24,GROUND+4); D.px(90,GROUND+6); D.px(180,GROUND+3); }
+function ground(gy=GROUND){ D.fill(0,gy,W,1); D.px(24,gy+4); D.px(90,gy+6); D.px(180,gy+3); }
 function grassAt(x){ D.px(x,GROUND-1); D.px(x+1,GROUND-2); D.px(x+2,GROUND-1); }
 function flowerAt(x){ D.fill(x,GROUND-2,1,2); D.px(x-1,GROUND-3,FADED); D.px(x+1,GROUND-3,FADED);
   D.px(x,GROUND-4,FADED); D.px(x,GROUND-3); }
@@ -258,8 +258,8 @@ function skyBlips(maxY){                       // blipping cookies fill spare sk
       ctx.drawImage(BGCOOKIES[i%3],(12+r1*(W-36)+(14-s)/2)|0,(10+r2*zone+(14-s)/2)|0,s,s); } }
 }
 
-function interiorScene(){                      // menu + intro opening
-  const mx=36, B=GROUND;                       // big machine; flow right -> left
+function interiorScene(B=GROUND){              // menu + intro opening
+  const mx=36;                                 // big machine; flow right -> left
   const sy=Math.round(H*0.22);                 // sign, ~78% up the screen
   D.fill(34,sy,172,16,CREAM); D.box(34,sy,172,16);
   signText("KINSCO'S COOKIE LAB",120,sy+8.5);
@@ -300,7 +300,7 @@ function interiorScene(){                      // menu + intro opening
   for(let i=0;i<3;i++){ const ix=mx+8-((off+i*36)%108);
     if(ix>-18) ctx.drawImage(COOKIES[i%3],(ix-9)|0,B-48,18,18); }
   ctx.restore();
-  ground();
+  ground(B);
 }
 
 function exteriorScene(damaged,shake=0){       // tiny lab atop a big distant hill
@@ -392,10 +392,11 @@ S.menu={   // lab interior
     '<button class="btn" id="pre">Pre-order</button><button class="btn" id="fb">Feedback</button></div>';
     ui.querySelector("#pre").onclick=e=>{ e.stopPropagation(); setState("intro"); };
     ui.querySelector("#fb").onclick =e=>{ e.stopPropagation(); setState("feedback"); }; },
-  draw(dt){ interiorScene();
-    mascotAt(170,GROUND-79,2);                                         // Kin loading the belt
-    if((t*0.9|0)!==((t-dt)*0.9|0)) puff(54,GROUND-96);                 // machine smoke
-    if((t*0.7|0)!==((t-dt)*0.7|0)) puff(202,GROUND-197,0.5);           // flask steam
+  draw(dt){ const B2=Math.round(H*0.90);       // menu floor sits lower, 10% from the bottom
+    interiorScene(B2);
+    mascotAt(170,B2-79,2);                                             // Kin loading the belt
+    if((t*0.9|0)!==((t-dt)*0.9|0)) puff(54,B2-96);                     // machine smoke
+    if((t*0.7|0)!==((t-dt)*0.7|0)) puff(202,B2-197,0.5);               // flask steam
     drawSmokes(dt); },
 };
 
@@ -416,16 +417,17 @@ S.intro={  // inside: smoke ramps ~7s -> outside: 3s shake, BOOM, spin-up, drop-
     ui.innerHTML=HOME+'<div class="hint blink">(tap to skip)</div>'; },
   draw(dt){
     if(t<7.4){
-      interiorScene();
-      mascotAt(170,GROUND-79,2,t>6.2?(now/200|0)%2:undefined);
+      const B2=Math.round(H*0.90);             // interior floor matches the menu
+      interiorScene(B2);
+      mascotAt(170,B2-79,2,t>6.2?(now/200|0)%2:undefined);
       const lvl=Math.min(3,1+(t/2|0)), rate=[0.8,1.7,3.4][lvl-1];     // smoke level up every 2s
       dialT=[400,220,120][lvl-1];                                     // machine panics too
       if((t*rate|0)!==((t-dt)*rate|0)){
-        if(lvl===1) puff(54,GROUND-96,0.55);
-        else if(lvl===2) puff(54,GROUND-96,0.15);
-        else { puff(54,GROUND-102,0,true); puff(50+Math.random()*8,GROUND-94,0.3); } }
-      if(t>6.2){ D.fill(122,GROUND-110,56,16,CREAM); D.box(122,GROUND-110,56,16);
-        signText("Oh no!",150,GROUND-102); }
+        if(lvl===1) puff(54,B2-96,0.55);
+        else if(lvl===2) puff(54,B2-96,0.15);
+        else { puff(54,B2-102,0,true); puff(50+Math.random()*8,B2-94,0.3); } }
+      if(t>6.2){ D.fill(122,B2-100,56,16,CREAM); D.box(122,B2-100,56,16);
+        signText("Oh no!",150,B2-92); }
       drawSmokes(dt);
     } else {
       if(!this.cut){ this.cut=true; smokes=[]; }   // scene cut: drop indoor smoke
